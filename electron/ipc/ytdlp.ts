@@ -7,6 +7,7 @@ import {
   DownloadFailedEvent,
   DownloadProgressEvent,
 } from '../types/DownloadProgressEvent';
+import { downloadQueueService } from '../services/DownloadQueueService';
 
 export function registerYtDlpIpc(): void {
   ipcMain.handle('ytdlp:getVersion', () => {
@@ -23,7 +24,7 @@ export function registerYtDlpIpc(): void {
       const window = BrowserWindow.fromWebContents(_event.sender);
 
       try {
-        const result = await downloadService.download(selection, (line) => {
+        const result = await downloadQueueService.enqueue(selection, (line) => {
           const progress = progressService.parse(line);
 
           if (!progress) {

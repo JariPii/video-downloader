@@ -2,7 +2,6 @@
 
 import { Button } from '@/components/ui/button';
 import { DownloadJob } from '@/shared/models/DownloadJob';
-import { stat } from 'fs';
 
 interface DownloadQueueProps {
   jobs: DownloadJob[];
@@ -11,7 +10,7 @@ interface DownloadQueueProps {
 }
 
 const statusText: Record<DownloadJob['status'], string> = {
-  pending: 'Pending',
+  queued: 'Queued',
   downloading: 'Downloading',
   completed: 'Completed',
   failed: 'Failed',
@@ -61,7 +60,7 @@ const DownloadQueue = ({ jobs, onCancel, onRemove }: DownloadQueueProps) => {
             </div>
           </div>
 
-          {(job.status === 'pending' || job.status === 'downloading') && (
+          {(job.status === 'queued' || job.status === 'downloading') && (
             <Button
               type='button'
               onClick={() => onCancel(job.id)}

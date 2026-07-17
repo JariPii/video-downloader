@@ -83,7 +83,7 @@ export default function Home() {
       resolution: selectedFormat.resolution,
       filesize: selectedFormat.filesize,
       outputFolder,
-      status: 'pending',
+      status: 'queued',
       progress: {
         percent: 0,
         speed: '',

@@ -738,6 +738,57 @@ var ProgressService = class {
 };
 var progressService = new ProgressService();
 
+// electron/services/DownloadQueueService.ts
+var DownloadQueueService = class {
+  constructor() {
+    this.queue = [];
+    this.active = /* @__PURE__ */ new Set();
+    this.maxConcurrentDls = 1;
+  }
+  enqueue(selection, onProgress) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({
+        selection,
+        onProgress,
+        resolve,
+        reject
+      });
+      this.startNext();
+    });
+  }
+  queueLength() {
+    return this.queue.length;
+  }
+  getActiveCount() {
+    return this.active.size;
+  }
+  startNext() {
+    while (this.active.size < this.maxConcurrentDls && this.queue.length > 0) {
+      const item = this.queue.shift();
+      if (!item) {
+        return;
+      }
+      this.active.add(item.selection.downloadId);
+      void this.run(item);
+    }
+  }
+  async run(item) {
+    try {
+      const result = await downloadService.download(
+        item.selection,
+        item.onProgress
+      );
+      item.resolve(result);
+    } catch (error) {
+      item.reject(error);
+    } finally {
+      this.active.delete(item.selection.downloadId);
+      this.startNext();
+    }
+  }
+};
+var downloadQueueService = new DownloadQueueService();
+
 // electron/ipc/ytdlp.ts
 function registerYtDlpIpc() {
   ipcMain3.handle("ytdlp:getVersion", () => {
@@ -751,7 +802,7 @@ function registerYtDlpIpc() {
     async (_event, selection) => {
       const window = BrowserWindow.fromWebContents(_event.sender);
       try {
-        const result = await downloadService.download(selection, (line) => {
+        const result = await downloadQueueService.enqueue(selection, (line) => {
           const progress = progressService.parse(line);
           if (!progress) {
             return;

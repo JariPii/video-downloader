@@ -1,7 +1,7 @@
 import { DownloadProgress } from '@/electron/types/DownloadProgress';
 
 export type DownloadStatus =
-  | 'pending'
+  | 'queued'
   | 'downloading'
   | 'completed'
   | 'failed'
