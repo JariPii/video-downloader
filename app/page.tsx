@@ -63,25 +63,22 @@ export default function Home() {
     setOutputFolder(folder);
   }
 
-  async function handleDownload() {
-    if (!videoInfo || !selectedFormatId || !outputFolder) {
-      return;
-    }
-
+  async function startDownload(
+    video: VideoInfo,
+    formatId: string,
+    outputFolder: string,
+  ) {
     const downloadId = crypto.randomUUID();
 
-    const selectedFormat = formatService.findById(
-      videoInfo.formats,
-      selectedFormatId,
-    );
+    const selectedFormat = formatService.findById(video.formats, formatId);
 
     if (!selectedFormat) {
-      return;
+      throw new Error('Selected format was not found.');
     }
 
     addJob({
       id: downloadId,
-      title: videoInfo.title,
+      title: video.title,
       extension: selectedFormat.extension,
       resolution: selectedFormat.resolution,
       filesize: selectedFormat.filesize,
@@ -94,33 +91,88 @@ export default function Home() {
       },
     });
 
-    // try {
-    const result = await window.electron.ytdlp.download({
-      downloadId,
-      url: videoInfo.webpageUrl,
-      formatId: selectedFormatId,
-      outputFolder,
-      formats: videoInfo.formats,
-      title: videoInfo.title,
-      uploader: videoInfo.uploader,
-      thumbnail: videoInfo.thumbnail,
-      duration: videoInfo.duration,
-    });
+    try {
+      const result = await window.electron.ytdlp.download({
+        downloadId,
+        url: video.webpageUrl,
+        formatId,
+        outputFolder,
+        formats: video.formats,
+        title: video.title,
+        uploader: video.uploader,
+        thumbnail: video.thumbnail,
+        duration: video.duration,
+      });
 
-    if (result === 'completed') {
-      const history = await window.electron.history.get();
+      if (result === 'completed') {
+        const history = await window.electron.history.get();
 
-      setHistory(history);
+        setHistory(history);
+      }
+    } catch (error) {
+      console.error(error);
     }
-    //   setCompleted(downloadId);
-    // } catch (error) {
-    //   console.error(error);
-    //   setFailed(downloadId);
-    // }
+  }
+
+  async function handleDownload() {
+    if (!videoInfo || !selectedFormatId || !outputFolder) {
+      return;
+    }
+
+    await startDownload(videoInfo, selectedFormatId, outputFolder);
   }
 
   async function handleCancel(downloadId: string) {
     await window.electron.ytdlp.cancel(downloadId);
+  }
+
+  async function handleDownloadAgain(item: DownloadHistoryItem) {
+    try {
+      const info = (await window.electron.ytdlp.getVideoInfo(
+        item.url,
+      )) as VideoInfo;
+
+      const formatExists = formatService.findById(info.formats, item.formatId);
+
+      if (!formatExists) {
+        window.alert(
+          [
+            'The saved format is no longer available',
+            '',
+            'The video has probably been updated since it was downloaded.',
+            'Please select a new format and download it manually',
+          ].join('\n'),
+        );
+
+        return;
+      }
+
+      await startDownload(info, item.formatId, item.outputFolder);
+    } catch (error) {
+      console.error(error);
+      window.alert('Failed to retrieve the latest information for this video.');
+    }
+  }
+
+  async function handleRemoveFromHistory(id: string) {
+    await window.electron.history.remove(id);
+
+    const history = await window.electron.history.get();
+
+    setHistory(history);
+  }
+
+  async function handleClearHistory() {
+    const confirmed = window.confirm(
+      'Are you sure you want to clear the download history?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+    await window.electron.history.clear();
+
+    setHistory([]);
   }
 
   return (
@@ -166,7 +218,12 @@ export default function Home() {
           onRemove={removeJob}
         />
 
-        <HistoryList items={history} />
+        <HistoryList
+          items={history}
+          onDownloadAgain={handleDownloadAgain}
+          onRemove={handleRemoveFromHistory}
+          onClear={handleClearHistory}
+        />
       </main>
     </div>
   );

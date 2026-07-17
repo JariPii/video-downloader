@@ -1,23 +1,36 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
+import { Button } from '@/components/ui/button';
 import { DownloadHistoryItem } from '@/shared/models/DownloadHistoryItem';
 
 interface HistoryListProps {
   items: DownloadHistoryItem[];
+  onDownloadAgain(item: DownloadHistoryItem): void;
+  onRemove(id: string): void;
+  onClear(): void;
 }
 
-const HistoryList = ({ items }: HistoryListProps) => {
+const HistoryList = ({
+  items,
+  onDownloadAgain,
+  onRemove,
+  onClear,
+}: HistoryListProps) => {
   if (items.length === 0) {
     return (
       <div className='mt-8'>
         <h2 className='text-lg font-semibold'>History</h2>
-        <p className='text-gray-500'>Now downloads yet.</p>
+        <p className='text-gray-500'>No downloads yet.</p>
       </div>
     );
   }
   return (
     <div className='mt-8 space-y-4'>
       <h2 className='text-lg font-semibold'>History</h2>
+      <Button variant={'outline'} onClick={onClear}>
+        Clear history
+      </Button>
 
       {items.map((item) => (
         <div key={item.id} className='rounded-lg border bg-white p-4 shadow-sm'>
@@ -39,6 +52,16 @@ const HistoryList = ({ items }: HistoryListProps) => {
                 </div>
                 <div>{new Date(item.downloadedAt).toLocaleString()}</div>
               </div>
+              <Button onClick={() => onDownloadAgain(item)}>
+                Download again
+              </Button>
+              <Button
+                variant={'destructive'}
+                className='mt-2'
+                onClick={() => onRemove(item.id)}
+              >
+                Remove
+              </Button>
             </div>
           </div>
         </div>

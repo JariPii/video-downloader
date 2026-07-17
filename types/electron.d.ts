@@ -53,6 +53,7 @@ declare global {
       history: {
         get: () => Promise<DownloadHistoryItem[]>;
         add: (item: DownloadHistoryItem) => Promise<void>;
+        remove: (id: string) => Promise<void>;
         clear: () => Promise<void>;
       };
     };

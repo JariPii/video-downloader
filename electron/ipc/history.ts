@@ -14,4 +14,8 @@ export function registerHistoryIpc(): void {
   ipcMain.handle('history:clear', async () => {
     await historyService.clear();
   });
+
+  ipcMain.handle('history:remove', async (_event, id: string) => {
+    await historyService.remove(id);
+  });
 }

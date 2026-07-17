@@ -30,6 +30,14 @@ export class HistoryService {
     await this.save([]);
   }
 
+  public async remove(id: string): Promise<void> {
+    const history = await this.getAll();
+
+    const updatedHistory = history.filter((item) => item.id !== id);
+
+    await this.save(updatedHistory);
+  }
+
   private async save(history: DownloadHistoryItem[]): Promise<void> {
     await fs.writeFile(this.filePath, JSON.stringify(history, null, 2), 'utf8');
   }

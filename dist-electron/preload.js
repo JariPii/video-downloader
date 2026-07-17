@@ -39,6 +39,7 @@ import_electron.contextBridge.exposeInMainWorld("electron", {
   history: {
     get: () => import_electron.ipcRenderer.invoke("history:get"),
     add: (item) => import_electron.ipcRenderer.invoke("history:add", item),
+    remove: (id) => import_electron.ipcRenderer.invoke("history:remove", id),
     clear: () => import_electron.ipcRenderer.invoke("history:clear")
   }
 });

@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('electron', {
   history: {
     get: () => ipcRenderer.invoke('history:get'),
     add: (item: DownloadHistoryItem) => ipcRenderer.invoke('history:add', item),
+    remove: (id: string) => ipcRenderer.invoke('history:remove', id),
     clear: () => ipcRenderer.invoke('history:clear'),
   },
 });
