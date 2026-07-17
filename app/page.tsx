@@ -1,64 +1,172 @@
-import Image from "next/image";
+'use client';
+import DownloadButton from '@/app/features/downloader/components/DownloadButton';
+import DownloadPanel from '@/app/features/downloader/components/DownloadPanel';
+import FormatSelector from '@/app/features/downloader/components/FormatSelector';
+import UrlForm from '@/app/features/downloader/components/UrlForm';
+import VideoInfoCard from '@/app/features/downloader/components/VideoInfoCard';
+import { VideoInfo } from '@/shared/models/VideoInfo';
+import { formatService } from '@/shared/services/FormatService';
+import { useEffect, useState } from 'react';
+import { useDownloadQueue } from './features/downloader/hooks/useDownloadQueue';
+import DownloadQueue from './features/downloader/components/DownloadQueue';
+import { DownloadHistoryItem } from '@/shared/models/DownloadHistoryItem';
+import HistoryList from './features/downloader/components/HistoryList';
 
 export default function Home() {
+  const [outputFolder, setOutputFolder] = useState('');
+  const [url, setUrl] = useState('');
+  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedFormatId, setSelectedFormatId] = useState('');
+  const [history, setHistory] = useState<DownloadHistoryItem[]>([]);
+
+  // const { jobs, addJob, setCompleted, setFailed } = useDownloadQueue();
+  const { jobs, addJob, removeJob } = useDownloadQueue();
+
+  useEffect(() => {
+    async function loadSettings() {
+      const settings = await window.electron.settings.get();
+
+      setOutputFolder(settings.outputFolder);
+
+      const history = await window.electron.history.get();
+
+      setHistory(history);
+    }
+
+    void loadSettings();
+  }, []);
+
+  async function handleGetVideoInfo() {
+    if (!url.trim()) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const info = await window.electron.ytdlp.getVideoInfo(url);
+
+      setVideoInfo(info as VideoInfo);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSelectFolder() {
+    const folder = await window.electron.dialog.selectFolder();
+
+    if (!folder) {
+      return;
+    }
+
+    setOutputFolder(folder);
+  }
+
+  async function handleDownload() {
+    if (!videoInfo || !selectedFormatId || !outputFolder) {
+      return;
+    }
+
+    const downloadId = crypto.randomUUID();
+
+    const selectedFormat = formatService.findById(
+      videoInfo.formats,
+      selectedFormatId,
+    );
+
+    if (!selectedFormat) {
+      return;
+    }
+
+    addJob({
+      id: downloadId,
+      title: videoInfo.title,
+      extension: selectedFormat.extension,
+      resolution: selectedFormat.resolution,
+      filesize: selectedFormat.filesize,
+      outputFolder,
+      status: 'pending',
+      progress: {
+        percent: 0,
+        speed: '',
+        eta: '',
+      },
+    });
+
+    // try {
+    const result = await window.electron.ytdlp.download({
+      downloadId,
+      url: videoInfo.webpageUrl,
+      formatId: selectedFormatId,
+      outputFolder,
+      formats: videoInfo.formats,
+      title: videoInfo.title,
+      uploader: videoInfo.uploader,
+      thumbnail: videoInfo.thumbnail,
+      duration: videoInfo.duration,
+    });
+
+    if (result === 'completed') {
+      const history = await window.electron.history.get();
+
+      setHistory(history);
+    }
+    //   setCompleted(downloadId);
+    // } catch (error) {
+    //   console.error(error);
+    //   setFailed(downloadId);
+    // }
+  }
+
+  async function handleCancel(downloadId: string) {
+    await window.electron.ytdlp.cancel(downloadId);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className='h-screen bg-gray-100 p-10'>
+      <main className=''>
+        <div className='p-2 bg-gray-300'>
+          <UrlForm
+            url={url}
+            loading={loading}
+            onUrlChange={setUrl}
+            onSubmit={handleGetVideoInfo}
+          />
+        </div>
+        {videoInfo && <VideoInfoCard videoInfo={videoInfo} />}
+
+        {videoInfo && (
+          <FormatSelector
+            combinedFormats={formatService.getCombinedFormats(
+              videoInfo.formats,
+            )}
+            videoFormats={formatService.getVideoFormats(videoInfo.formats)}
+            audioFormats={formatService.getAudioFormats(videoInfo.formats)}
+            selectedFormatId={selectedFormatId}
+            onChange={setSelectedFormatId}
+          />
+        )}
+
+        <DownloadPanel
+          outputFolder={outputFolder}
+          onSelectFolder={handleSelectFolder}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        <DownloadButton
+          disabled={!videoInfo || !selectedFormatId || !outputFolder}
+          onClick={handleDownload}
+        />
+
+        {/* <DownloadProgress /> */}
+
+        <DownloadQueue
+          jobs={jobs}
+          onCancel={handleCancel}
+          onRemove={removeJob}
+        />
+
+        <HistoryList items={history} />
       </main>
     </div>
   );

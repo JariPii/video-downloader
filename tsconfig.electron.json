@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "es6",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "rootDir": "./electron",
+    "outDir": "./dist-electron",
+    "types": ["node"],
+    "sourceMap": true,
+    "declaration": false,
+    "noEmitOnError": true
+  },
+  "include": ["electron/**/*.ts"]
+}
