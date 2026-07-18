@@ -7,6 +7,9 @@ import { retryService } from './RetryService';
 import { DownloadError } from '../errors/DownloadError';
 import { downloadErrorMapper } from '../mappers/DownloadErrorMapper';
 import { DownloadErrorCode } from '../enums/DownloadErrorCode';
+import { PlaylistInfo } from '@/shared/models/PlaylistInfo';
+import { YtDlpPlaylistInfo } from '../types/YtDlpPlaylistInfo';
+import { playlistMapper } from '../mappers/PlaylistMapper';
 
 export class YtDlpService {
   public async getVersion(): Promise<string> {
@@ -57,26 +60,26 @@ export class YtDlpService {
       'Ingen kompatibel webläsare med giltiga cookies kunde användas.',
       false,
     );
-    // let args = ytDlpArgumentService.buildInfoArguments(url);
-    // try {
-    //   return await this.runInfo(args);
-    // } catch (error) {
-    //   if (
-    //     error instanceof DownloadError &&
-    //     error.code === DownloadErrorCode.AuthenticationRequired
-    //   ) {
-    //     args = ytDlpArgumentService.buildInfoArgumentsWithCookies(
-    //       url,
-    //       'chrome',
-    //     );
-    //     return await this.runInfo(args);
-    //   }
-
-    //   throw error;
-    // }
   }
 
-  private async runInfo(args: string[]) {
+  public async getPlaylistInfo(url: string): Promise<PlaylistInfo> {
+    const json = (await this.runJson(
+      ytDlpArgumentService.buildPlaylistArguments(url),
+    )) as YtDlpPlaylistInfo;
+
+    console.log('entries', json.entries.length);
+
+    const duplicateEntries = json.entries.filter(
+      (entry, index, array) =>
+        array.findIndex((e) => e.id === entry.id) !== index,
+    );
+
+    console.log('duplicate entries', duplicateEntries.length);
+
+    return playlistMapper.map(json);
+  }
+
+  private async runJson(args: string[]) {
     const executable = binaryService.getYtDlpPath();
 
     try {
@@ -88,9 +91,7 @@ export class YtDlpService {
             throw downloadErrorMapper.map(result.stderr);
           }
 
-          const json = JSON.parse(result.stdout) as YtDlpVideoInfo;
-
-          return videoMapper.map(json);
+          return JSON.parse(result.stdout);
         },
         1,
         2000,
@@ -107,6 +108,42 @@ export class YtDlpService {
 
       throw error;
     }
+  }
+
+  private async runInfo(args: string[]) {
+    const json = (await this.runJson(args)) as YtDlpVideoInfo;
+
+    return videoMapper.map(json);
+    // const executable = binaryService.getYtDlpPath();
+
+    // try {
+    //   return await retryService.execute(
+    //     async () => {
+    //       const result = await processService.run(executable, args);
+
+    //       if (result.exitCode !== 0) {
+    //         throw downloadErrorMapper.map(result.stderr);
+    //       }
+
+    //       const json = JSON.parse(result.stdout) as YtDlpVideoInfo;
+
+    //       return videoMapper.map(json);
+    //     },
+    //     1,
+    //     2000,
+    //     (error) => error instanceof DownloadError && error.retryable,
+    //   );
+    // } catch (error) {
+    //   if (error instanceof DownloadError) {
+    //     throw error;
+    //   }
+
+    //   if (error instanceof Error) {
+    //     throw downloadErrorMapper.map(error.message);
+    //   }
+
+    //   throw error;
+    // }
   }
 }
 

@@ -1,3 +1,4 @@
+import { PlaylistQuality } from '../models/PlaylistQuality';
 import { VideoFormat } from '../models/VideoFormat';
 
 export class FormatService {
@@ -51,14 +52,76 @@ export class FormatService {
     return [...formats].sort((a, b) => this.getPixels(b) - this.getPixels(a));
   }
 
+  public findBestPlaylistFormat(
+    formats: VideoFormat[],
+    quality: PlaylistQuality,
+  ): VideoFormat | undefined {
+    switch (quality) {
+      case 'best':
+        return this.getBestCombined(formats) ?? this.getBestVideo(formats);
+
+      case '1080':
+        const video1080 = this.sortByResolution(
+          this.getVideoFormats(formats).filter(
+            (format) => this.getPixels(format) <= 1920 * 1080,
+          ),
+        )[0];
+        return (
+          video1080 ??
+          this.getBestVideo(formats) ??
+          this.getBestCombined(formats)
+        );
+
+      case '720':
+        const video720 = this.sortByResolution(
+          this.getVideoFormats(formats).filter(
+            (format) => this.getPixels(format) <= 1280 * 720,
+          ),
+        )[0];
+        return (
+          video720 ??
+          this.getBestVideo(formats) ??
+          this.getBestCombined(formats)
+        );
+
+      case '480':
+        const video480 = this.sortByResolution(
+          this.getVideoFormats(formats).filter(
+            (format) => this.getPixels(format) <= 854 * 480,
+          ),
+        )[0];
+        return (
+          video480 ??
+          this.getBestVideo(formats) ??
+          this.getBestCombined(formats)
+        );
+
+      case 'audio':
+        return this.getBestAudio(formats);
+    }
+  }
+
   private getPixels(format: VideoFormat): number {
     const parts = format.resolution.split('x');
 
     if (parts.length !== 2) {
+      const resolutionMatch = format.resolution.match(/(\d+)p?/);
+      if (!resolutionMatch) {
+        return 0;
+      }
+      const height = Number(resolutionMatch[1]);
+      const width = Math.round((height * 16) / 9);
+      return width * height;
+    }
+
+    const width = Number(parts[0]);
+    const height = Number(parts[1]);
+
+    if (isNaN(width) || isNaN(height)) {
       return 0;
     }
 
-    return Number(parts[0]) * Number(parts[1]);
+    return width * height;
   }
 }
 

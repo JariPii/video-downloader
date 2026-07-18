@@ -51,6 +51,10 @@ export class YtDlpArgumentService {
     ];
   }
 
+  public buildPlaylistArguments(url: string): string[] {
+    return ['--dump-single-json', '--flat-playlist', '--skip-download', url];
+  }
+
   private buildCommonArguments(): string[] {
     return ['--newline'];
   }

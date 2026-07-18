@@ -21,6 +21,7 @@ import_electron.contextBridge.exposeInMainWorld("electron", {
   ytdlp: {
     getVersion: () => import_electron.ipcRenderer.invoke("ytdlp:getVersion"),
     getVideoInfo: (url) => import_electron.ipcRenderer.invoke("ytdlp:getVideoInfo", url),
+    getPlaylistInfo: (url) => import_electron.ipcRenderer.invoke("ytdlp:getPlaylistInfo", url),
     download: (selection) => import_electron.ipcRenderer.invoke("ytdlp:download", selection),
     cancel: (downloadId) => import_electron.ipcRenderer.invoke("ytdlp:cancel", downloadId),
     onProgress: (callback) => subscribe("ytdlp:progress", callback),

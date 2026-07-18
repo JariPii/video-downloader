@@ -49,21 +49,6 @@ var BinaryService = class {
     }
     return binaryPath;
   }
-  // public getYtDlpPath(): string {
-  //   return app.isPackaged
-  //     ? path.join(process.resourcesPath, 'binaries', 'yt-dlp.exe')
-  //     : path.join(process.cwd(), 'resources', 'binaries', 'yt-dlp.exe');
-  // }
-  // public getFfmpegPath(): string {
-  //   return app.isPackaged
-  //     ? path.join(process.resourcesPath, 'binaries', 'ffmpeg.exe')
-  //     : path.join(process.cwd(), 'resources', 'binaries', 'ffmpeg.exe');
-  // }
-  // public getFfprobePath(): string {
-  //   return app.isPackaged
-  //     ? path.join(process.resourcesPath, 'binaries', 'ffprobe.exe')
-  //     : path.join(process.cwd(), 'resources', 'binaries', 'ffprobe.exe');
-  // }
 };
 var binaryService = new BinaryService();
 
@@ -310,12 +295,52 @@ var FormatService = class {
   sortByResolution(formats) {
     return [...formats].sort((a, b) => this.getPixels(b) - this.getPixels(a));
   }
+  findBestPlaylistFormat(formats, quality) {
+    switch (quality) {
+      case "best":
+        return this.getBestCombined(formats) ?? this.getBestVideo(formats);
+      case "1080":
+        const video1080 = this.sortByResolution(
+          this.getVideoFormats(formats).filter(
+            (format) => this.getPixels(format) <= 1920 * 1080
+          )
+        )[0];
+        return video1080 ?? this.getBestVideo(formats) ?? this.getBestCombined(formats);
+      case "720":
+        const video720 = this.sortByResolution(
+          this.getVideoFormats(formats).filter(
+            (format) => this.getPixels(format) <= 1280 * 720
+          )
+        )[0];
+        return video720 ?? this.getBestVideo(formats) ?? this.getBestCombined(formats);
+      case "480":
+        const video480 = this.sortByResolution(
+          this.getVideoFormats(formats).filter(
+            (format) => this.getPixels(format) <= 854 * 480
+          )
+        )[0];
+        return video480 ?? this.getBestVideo(formats) ?? this.getBestCombined(formats);
+      case "audio":
+        return this.getBestAudio(formats);
+    }
+  }
   getPixels(format) {
     const parts = format.resolution.split("x");
     if (parts.length !== 2) {
+      const resolutionMatch = format.resolution.match(/(\d+)p?/);
+      if (!resolutionMatch) {
+        return 0;
+      }
+      const height2 = Number(resolutionMatch[1]);
+      const width2 = Math.round(height2 * 16 / 9);
+      return width2 * height2;
+    }
+    const width = Number(parts[0]);
+    const height = Number(parts[1]);
+    if (isNaN(width) || isNaN(height)) {
       return 0;
     }
-    return Number(parts[0]) * Number(parts[1]);
+    return width * height;
   }
 };
 var formatService = new FormatService();
@@ -353,6 +378,9 @@ var YtDlpArgumentService = class {
       "-J",
       url2
     ];
+  }
+  buildPlaylistArguments(url2) {
+    return ["--dump-single-json", "--flat-playlist", "--skip-download", url2];
   }
   buildCommonArguments() {
     return ["--newline"];
@@ -470,6 +498,30 @@ var DownloadErrorMapper = class {
 };
 var downloadErrorMapper = new DownloadErrorMapper();
 
+// electron/mappers/PlaylistMapper.ts
+var PlaylistMapper = class {
+  map(json) {
+    return {
+      id: json.id,
+      title: json.title,
+      uploader: json.uploader ?? "",
+      thumbnail: json.thumbnail ?? "",
+      videoCount: json.playlist_count ?? json.entries?.length ?? 0,
+      videos: json.entries.map((entry) => this.mapVideo(entry))
+    };
+  }
+  mapVideo(entry) {
+    return {
+      id: entry.id,
+      title: entry.title,
+      url: entry.url ?? `https://www.youtube.com/watch?v=${entry.id}`,
+      duration: entry.duration ?? 0,
+      thumbnail: entry.thumbnails?.[0]?.url ?? ""
+    };
+  }
+};
+var playlistMapper = new PlaylistMapper();
+
 // electron/services/YtDlpService.ts
 var YtDlpService = class {
   async getVersion() {
@@ -507,7 +559,18 @@ var YtDlpService = class {
       false
     );
   }
-  async runInfo(args) {
+  async getPlaylistInfo(url2) {
+    const json = await this.runJson(
+      ytDlpArgumentService.buildPlaylistArguments(url2)
+    );
+    console.log("entries", json.entries.length);
+    const duplicateEntries = json.entries.filter(
+      (entry, index, array) => array.findIndex((e) => e.id === entry.id) !== index
+    );
+    console.log("duplicate entries", duplicateEntries.length);
+    return playlistMapper.map(json);
+  }
+  async runJson(args) {
     const executable = binaryService.getYtDlpPath();
     try {
       return await retryService.execute(
@@ -516,8 +579,7 @@ var YtDlpService = class {
           if (result.exitCode !== 0) {
             throw downloadErrorMapper.map(result.stderr);
           }
-          const json = JSON.parse(result.stdout);
-          return videoMapper.map(json);
+          return JSON.parse(result.stdout);
         },
         1,
         2e3,
@@ -532,6 +594,10 @@ var YtDlpService = class {
       }
       throw error;
     }
+  }
+  async runInfo(args) {
+    const json = await this.runJson(args);
+    return videoMapper.map(json);
   }
 };
 var ytDlpService = new YtDlpService();
@@ -796,6 +862,9 @@ function registerYtDlpIpc() {
   });
   ipcMain3.handle("ytdlp:getVideoInfo", (_event, url2) => {
     return ytDlpService.getVideoInfo(url2);
+  });
+  ipcMain3.handle("ytdlp:getPlaylistInfo", (_event, url2) => {
+    return ytDlpService.getPlaylistInfo(url2);
   });
   ipcMain3.handle(
     "ytdlp:download",

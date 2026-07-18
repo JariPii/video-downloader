@@ -18,6 +18,10 @@ export function registerYtDlpIpc(): void {
     return ytDlpService.getVideoInfo(url);
   });
 
+  ipcMain.handle('ytdlp:getPlaylistInfo', (_event, url: string) => {
+    return ytDlpService.getPlaylistInfo(url);
+  });
+
   ipcMain.handle(
     'ytdlp:download',
     async (_event, selection: DownloadSelection) => {

@@ -8,6 +8,7 @@ export function useDownloadQueue() {
   const [jobs, setJobs] = useState<DownloadJob[]>([]);
 
   function addJob(job: DownloadJob) {
+    console.log('QUEUE ADD', job.id);
     setJobs((previous) => [...previous, job]);
   }
 

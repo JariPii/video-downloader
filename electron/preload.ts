@@ -38,6 +38,9 @@ contextBridge.exposeInMainWorld('electron', {
     getVideoInfo: (url: string) =>
       ipcRenderer.invoke('ytdlp:getVideoInfo', url),
 
+    getPlaylistInfo: (url: string) =>
+      ipcRenderer.invoke('ytdlp:getPlaylistInfo', url),
+
     download: (selection: DownloadSelection) =>
       ipcRenderer.invoke('ytdlp:download', selection),
 

@@ -7,6 +7,7 @@ import {
 } from '@/electron/types/DownloadProgressEvent';
 import { DownloadHistoryItem } from '@/shared/models/DownloadHistoryItem';
 import { DownloadSelection } from '@/shared/models/DownloadSelection';
+import { PlaylistInfo } from '@/shared/models/PlaylistInfo';
 
 export {};
 
@@ -24,6 +25,7 @@ declare global {
       ytdlp: {
         getVersion(): Promise<string>;
         getVideoInfo(url: string): Promise<unknown>;
+        getPlaylistInfo(url: string): Promise<PlaylistInfo>;
         download(selection: DownloadSelection): Promise<DownloadResult>;
         cancel(downloadId: string): Promise<void>;
         onProgress(
